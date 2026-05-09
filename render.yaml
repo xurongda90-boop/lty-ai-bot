@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: lty-ai-department-bot
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn main:app --bind 0.0.0.0:$PORT
+    envVars:
+      - key: TELEGRAM_TOKEN
+        value: 8682566938:AAHxa7B23p6SPmTJKJ3AX6wNMuvZU3Jp29o
+      - key: COZE_API_TOKEN
+        value: pat_rg7DcUsUD6XHYVsw7VKYc0Z8WvJPgMo6qnCUHoEW5VJ3qUGm29nQ6PgYGTuC8dgm
+      - key: COZE_WORKFLOW_ID
+        value: "7637848097054425141"
+      - key: COZE_SPACE_ID
+        value: "7637048266257596432"
+      - key: TELEGRAM_GROUP_CHAT_ID
+        value: "-5290129358"
