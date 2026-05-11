@@ -7,9 +7,9 @@ from flask import Flask, request, jsonify
 
 # ========== 配置 ==========
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN", "8682566938:AAHxa7B23p6SPmTJKJ3AX6wNMuvZU3Jp29o")
-COZE_API_TOKEN = os.environ.get("COZE_API_TOKEN", "pat_rg7DcUsUD6XHYVsw7VKYc0Z8WvJPgMo6qnCUHoEW5VJ3qUGm29nQ6PgYGTuC8dgm")
-COZE_WORKFLOW_ID = os.environ.get("COZE_WORKFLOW_ID", "7637848097054425141")
-COZE_SPACE_ID = os.environ.get("COZE_SPACE_ID", "7637048266257596432")
+COZE_API_TOKEN = os.environ.get("COZE_API_TOKEN", "pat_NP962AYJl16Xt4agI3xKjc4wuHbtKIcNFBuxTdAtVOhjVPaUMhWuQdSTrTRQSYqx")
+COZE_WORKFLOW_ID = os.environ.get("COZE_WORKFLOW_ID", "7637454716594667573")
+COZE_SPACE_ID = os.environ.get("COZE_SPACE_ID", "7637089728185630773")
 TELEGRAM_GROUP_CHAT_ID = os.environ.get("TELEGRAM_GROUP_CHAT_ID", "-5290129358")
 
 TELEGRAM_API = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
@@ -27,7 +27,7 @@ DEPARTMENT_KEY_MAP = {
 }
 
 # ========== 日志 ==========
-logging.basicConfig(level=logging.INFO )
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
