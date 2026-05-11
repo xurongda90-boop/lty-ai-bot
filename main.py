@@ -14,9 +14,20 @@ TELEGRAM_GROUP_CHAT_ID = os.environ.get("TELEGRAM_GROUP_CHAT_ID", "-5290129358")
 
 TELEGRAM_API = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
 COZE_API = "https://api.coze.com/v1/workflow/run"
+LTY_TOKEN_API = "https://lty-nu.vercel.app/api/v1/token-usage"
+
+# ========== 员工 API Key 映射 ==========
+DEPARTMENT_KEY_MAP = {
+    "风控": "lty_YTYjozl01Ff9W4v4U0RNUNljybvgB8Hm",
+    "客服": "lty_1NDXjAlyHPdFshjqnT16gqtqKteYBW3C",
+    "策略": "lty_QeyZWoJyyOvhXKA1LgY0a4_dxJ6iBM--",
+    "合规": "lty_f6vyIMBjiLPDyvN8ylkJPXkFV69UuvDW",
+    "运营": "lty_52rPIJ8i3AcHXkzWwJu_a51WloejrvOJ",
+    "产品": "lty_3vNYbyQ5V5D-jfhqpgLbavGeMWyVAFfg",
+}
 
 # ========== 日志 ==========
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO )
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
@@ -37,6 +48,38 @@ def send_telegram_message(chat_id, text, reply_to_message_id=None):
     except Exception as e:
         logger.error(f"发送消息失败: {e}")
         return None
+
+def report_token_usage(department, model="gpt-4o-mini", input_chars=100, output_chars=100):
+    """直接调用 LTY 看板 API 上报 Token 使用情况"""
+    api_key = DEPARTMENT_KEY_MAP.get(department)
+    if not api_key:
+        logger.warning(f"未找到部门 '{department}' 对应的 API Key，跳过上报")
+        return False
+    
+    try:
+        resp = requests.post(
+            LTY_TOKEN_API,
+            headers={
+                "X-Api-Key": api_key,
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": model,
+                "inputChars": input_chars,
+                "outputChars": output_chars
+            },
+            timeout=10
+        )
+        result = resp.json()
+        if result.get("ok"):
+            logger.info(f"Token 上报成功：部门={department}, costHkd={result.get('costHkd')}")
+            return True
+        else:
+            logger.warning(f"Token 上报失败：{result}")
+            return False
+    except Exception as e:
+        logger.error(f"Token 上报异常：{e}")
+        return False
 
 def call_coze_workflow(user_message, user_id="anonymous"):
     """调用 Coze 工作流"""
@@ -63,12 +106,23 @@ def call_coze_workflow(user_message, user_id="anonymous"):
             data = result.get("data", "{}")
             if isinstance(data, str):
                 data = json.loads(data)
-            # 尝试获取 response 字段
-            response = data.get("response") or data.get("output") or data.get("result")
-            if not response:
-                # 如果没有标准字段，返回整个 data
-                response = str(data)
-            return response
+            
+            # 获取部门信息并上报 Token
+            department = data.get("department", "")
+            response_text = data.get("response") or data.get("output") or data.get("result")
+            
+            if department:
+                output_chars = len(response_text) if response_text else 100
+                report_token_usage(
+                    department=department,
+                    model="gpt-4o-mini",
+                    input_chars=len(user_message),
+                    output_chars=output_chars
+                )
+            
+            if not response_text:
+                response_text = str(data)
+            return response_text
         else:
             error_msg = result.get("msg", "工作流调用失败")
             logger.error(f"工作流错误：{error_msg}")
