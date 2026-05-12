@@ -26,6 +26,16 @@ DEPARTMENT_KEY_MAP = {
     "产品": "lty_3vNYbyQ5V5D-jfhqpgLbavGeMWyVAFfg",
 }
 
+# ========== 部门中文名映射 ==========
+DEPARTMENT_NAME_MAP = {
+    "风控": "AI-01 风控专员",
+    "客服": "AI-02 客服代理",
+    "策略": "AI-03 策略分析师",
+    "合规": "AI-04 合规监测员",
+    "运营": "AI-05 运营专员",
+    "产品": "AI-06 产品顾问",
+}
+
 # ========== 日志 ==========
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -49,12 +59,22 @@ def send_telegram_message(chat_id, text, reply_to_message_id=None):
         logger.error(f"发送消息失败: {e}")
         return None
 
-def report_token_usage(department, model="gpt-4o-mini", input_chars=100, output_chars=100):
-    """直接调用 LTY 看板 API 上报 Token 使用情况"""
+def report_token_usage(department, model="gpt-4o", input_chars=100, output_chars=100, action=None):
+    """调用 LTY 看板 API 上报 Token 使用情况（含模型、成本、结果摘要）"""
     api_key = DEPARTMENT_KEY_MAP.get(department)
     if not api_key:
         logger.warning(f"未找到部门 '{department}' 对应的 API Key，跳过上报")
         return False
+    
+    payload = {
+        "model": model,
+        "inputChars": input_chars,
+        "outputChars": output_chars,
+    }
+    
+    # 补充结果摘要（工作日志）
+    if action:
+        payload["action"] = action[:100]  # 截取前100字符作为摘要
     
     try:
         resp = requests.post(
@@ -63,16 +83,12 @@ def report_token_usage(department, model="gpt-4o-mini", input_chars=100, output_
                 "X-Api-Key": api_key,
                 "Content-Type": "application/json"
             },
-            json={
-                "model": model,
-                "inputChars": input_chars,
-                "outputChars": output_chars
-            },
+            json=payload,
             timeout=10
         )
         result = resp.json()
         if result.get("ok"):
-            logger.info(f"Token 上报成功：部门={department}, costHkd={result.get('costHkd')}")
+            logger.info(f"Token 上报成功：部门={department}, model={model}, costHkd={result.get('costHkd')}, action={action[:30] if action else None}")
             return True
         else:
             logger.warning(f"Token 上报失败：{result}")
@@ -80,6 +96,14 @@ def report_token_usage(department, model="gpt-4o-mini", input_chars=100, output_
     except Exception as e:
         logger.error(f"Token 上报异常：{e}")
         return False
+
+def build_action_summary(department, user_message, response_text):
+    """生成工作日志摘要"""
+    dept_name = DEPARTMENT_NAME_MAP.get(department, department)
+    # 取用户请求前20字符 + 回复前30字符
+    req_short = user_message[:20].replace("\n", " ")
+    resp_short = response_text[:30].replace("\n", " ") if response_text else ""
+    return f"{dept_name}处理：{req_short}… → {resp_short}"
 
 def call_coze_workflow(user_message, user_id="anonymous"):
     """调用 Coze 工作流"""
@@ -107,17 +131,21 @@ def call_coze_workflow(user_message, user_id="anonymous"):
             if isinstance(data, str):
                 data = json.loads(data)
             
-            # 获取部门信息并上报 Token
+            # 获取部门信息和回复内容
             department = data.get("department", "")
             response_text = data.get("response") or data.get("output") or data.get("result")
             
             if department:
                 output_chars = len(response_text) if response_text else 100
+                # 生成工作日志摘要
+                action_summary = build_action_summary(department, user_message, response_text)
+                # 上报：模型用 gpt-4o，附带结果摘要
                 report_token_usage(
                     department=department,
-                    model="gpt-4o-mini",
+                    model="gpt-4o",
                     input_chars=len(user_message),
-                    output_chars=output_chars
+                    output_chars=output_chars,
+                    action=action_summary
                 )
             
             if not response_text:
